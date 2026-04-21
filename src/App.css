@@ -590,6 +590,8 @@ textarea {
   padding: 30px;
   position: relative;
   box-shadow: var(--shadow);
+  max-height: 90vh;
+  overflow-y: auto;
 }
 
 .modal-close {
