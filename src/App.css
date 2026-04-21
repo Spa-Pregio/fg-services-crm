@@ -648,6 +648,11 @@ textarea {
   outline: none;
 }
 
+.field select option {
+  background: #1e1e2e;
+  color: #f6f2ea;
+}
+
 .field input:focus,
 .field select:focus,
 .field textarea:focus {
