@@ -26,7 +26,7 @@ const STATUS_COLORS = {
 
 export default function App() {
   const [showQuoteForm, setShowQuoteForm] = useState(false);
-  const isAdmin = window.location.pathname === "/admin";
+  const isAdmin = window.location.pathname === "/admin" || window.location.hash === "#admin";
 
   if (isAdmin) return <AdminApp />;
 
