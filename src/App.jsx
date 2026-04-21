@@ -42,7 +42,7 @@ function Header({ onQuote }) {
          <img
   src="/fg-logo.png"
   alt="F&G Services"
-  style={{ height: "52px", width: "auto" }}
+  style={{ height: "auto", width: "220px" }}
 />
         </div>
         <nav className="nav">
