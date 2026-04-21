@@ -151,49 +151,27 @@ function Bundle({ onQuote }) {
   return (
     <section className="section section-dark">
       <div className="container">
-        <div className="bundle-wrap">
-          <div className="bundle-text">
-            <p className="section-label">Signature Package</p>
-            <h2 className="section-title light">The Full Reset</h2>
-            <p className="section-copy light-copy">
-              Our most popular offering — a complete home refresh in a single
-              visit. We clean top to bottom, tackle the laundry, and organize
-              the spaces that need it most. You leave for the day and come home
-              to a house that feels brand new.
-            </p>
-            <ul className="check-list" style={{ marginTop: "28px" }}>
-              <li>Full top-to-bottom clean</li>
-              <li>Laundry washed, dried &amp; folded</li>
-              <li>Organization of up to 2 spaces</li>
-              <li>Custom pricing based on your home</li>
-            </ul>
-            <button
-              className="btn btn-gold"
-              onClick={onQuote}
-              style={{ marginTop: "32px" }}
-            >
-              Book The Full Reset
-            </button>
-          </div>
-          <div className="bundle-card">
-            <div className="bundle-badge">Most Popular</div>
-            <div className="bundle-icon">✦</div>
-            <h3 className="bundle-name">The Full Reset</h3>
-            <p className="bundle-desc">
-              Everything your home needs, handled in one visit. Our signature
-              bundle for clients who want it all done right.
-            </p>
-            <div className="bundle-includes">
-              <span>Cleaning</span>
-              <span>Laundry</span>
-              <span>Organization</span>
-            </div>
-            <p className="bundle-price">Custom Quote</p>
-            <p className="bundle-note">
-              Pricing based on home size &amp; services needed
-            </p>
-          </div>
-        </div>
+        <p className="section-label">Signature Package</p>
+        <h2 className="section-title light">The Full Reset</h2>
+        <p className="section-copy light-copy" style={{ margin: "0 auto 32px" }}>
+          Our most popular offering — a complete home refresh in a single visit.
+          We clean top to bottom, tackle the laundry, and organize the spaces
+          that need it most. You leave for the day and come home to a house that
+          feels brand new.
+        </p>
+        <ul className="check-list bundle-checklist">
+          <li>Full top-to-bottom clean</li>
+          <li>Laundry washed, dried &amp; folded</li>
+          <li>Organization of up to 2 spaces</li>
+          <li>Custom pricing based on your home</li>
+        </ul>
+        <button
+          className="btn btn-gold"
+          onClick={onQuote}
+          style={{ marginTop: "36px" }}
+        >
+          Book The Full Reset
+        </button>
       </div>
     </section>
   );
