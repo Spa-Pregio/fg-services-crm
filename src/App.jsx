@@ -39,11 +39,11 @@ function Header({ onQuote }) {
     <header className="header">
       <div className="container header-inner">
         <div className="brand">
-          <img
-            src="/F_G_Services_Elegant_Banner_Design.png"
-            alt="F&G Services"
-            style={{ height: "52px", width: "auto" }}
-          />
+         <img
+  src="/fg-logo.png"
+  alt="F&G Services"
+  style={{ height: "52px", width: "auto" }}
+/>
         </div>
         <nav className="nav">
           <a href="#services">Services</a>
