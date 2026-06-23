@@ -597,14 +597,27 @@ function QuoteModal({ onClose }) {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setStatus("loading");
-    const { error } = await supabase.from("leads").insert([{
+
+    const lead = {
       name: form.name, email: form.email,
       phone: form.phone || null, city: form.city || null,
       service: form.service, quote: form.quote ? parseFloat(form.quote) : null,
       notes: form.notes || null, status: "new",
-    }]);
-    if (error) { console.error(error); setStatus("error"); return; }
-    setStatus("success");
+    };
+
+    // 1. Save the lead to Supabase (powers the /admin dashboard)
+    const { error: dbError } = await supabase.from("leads").insert([lead]);
+    if (dbError) console.error("Supabase insert failed:", dbError);
+
+    // 2. Email F&G Services via the send-quote-email edge function (Resend)
+    try {
+      await supabase.functions.invoke("send-quote-email", { body: lead });
+    } catch (err) {
+      console.error("Quote notification email failed:", err);
+    }
+
+    // Lead is saved even if the email hiccups, so success tracks the save
+    setStatus(dbError ? "error" : "success");
   };
 
   return (
