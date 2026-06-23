@@ -1,0 +1,27 @@
+name: Keep Supabase Awake
+
+# Pings the Supabase database on a schedule so the free-tier project
+# never hits 7 days of inactivity and gets paused. Any real query
+# resets the timer; this just guarantees one happens twice a week.
+
+on:
+  schedule:
+    # 9:00 AM UTC every Monday and Thursday — twice a week, well inside
+    # the 7-day window so a single missed run won't cause a pause.
+    - cron: "0 9 * * 1,4"
+  workflow_dispatch: {}  # lets you run it manually from the Actions tab to test
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Query the database to reset the inactivity timer
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+        run: |
+          curl --fail --silent --show-error \
+            "${SUPABASE_URL}/rest/v1/leads?select=id&limit=1" \
+            -H "apikey: ${SUPABASE_ANON_KEY}" \
+            -H "Authorization: Bearer ${SUPABASE_ANON_KEY}" \
+            && echo "Supabase pinged successfully — inactivity timer reset."
