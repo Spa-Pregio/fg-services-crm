@@ -335,6 +335,41 @@ function AdminDashboard({ session }) {
 }
 
 // ─── Public Site ─────────────────────────────────────
+// ─── F&G services & pricing — single source of truth ──────────────
+// This ONE list feeds both the website Pricing section AND the quote-builder
+// dropdown, so the prices can never disagree. Change a price here and it
+// updates in both places. Fields:
+//   price:   number used to auto-fill the quote builder (null = no preset, just type it)
+//   display: how the price reads on the website (only when it's not a plain "$X")
+//   unit:    optional note shown in the quote dropdown (e.g. priced per sq ft)
+const MAIN_SERVICES = [
+  { name: "Commercial Cleaning", price: 0.25, display: "$0.25 / sq ft", unit: "per sq ft" },
+  { name: "Residential (Recurring)", price: null, display: "Custom Quote" },
+  { name: "Deep Cleaning", price: null, display: "Custom Quote" },
+  { name: "Move In / Move Out", price: null, display: "Custom Quote" },
+  { name: "The Full Reset Bundle", price: null, display: "Custom Quote" },
+];
+
+const ADDON_SERVICES = [
+  { name: "Oven Cleaning", price: 35 },
+  { name: "Fridge Cleaning", price: 40 },
+  { name: "Dishes", price: 25 },
+  { name: "Laundry (per load)", price: 15 },
+  { name: "Windows", price: 25 },
+  { name: "Ceiling Fans", price: 15 },
+  { name: "Home Organization", price: 75, display: "From $75" },
+  { name: "Junk Removal", price: null, display: "Custom Quote" },
+];
+
+// How a price reads on the website
+const priceLabel = (s) => s.display || ("$" + s.price);
+
+// Both lists power the quote-builder dropdown, with prices preset where we have them.
+const SERVICE_CATALOG = [...MAIN_SERVICES, ...ADDON_SERVICES].map(s => ({
+  name: s.unit ? `${s.name} (${s.unit})` : s.name,
+  price: s.price == null ? "" : s.price,
+}));
+
 function QuoteBuilder({ lead }) {
   const [items, setItems] = useState([{ id: 1, description: "", qty: 1, unitPrice: "" }]);
   const [frequency, setFrequency] = useState("one-time");
@@ -364,6 +399,21 @@ function QuoteBuilder({ lead }) {
   const addItem = () => setItems(prev => [...prev, { id: Date.now(), description: "", qty: 1, unitPrice: "" }]);
   const removeItem = (id) => setItems(prev => prev.length > 1 ? prev.filter(i => i.id !== id) : prev);
   const updateItem = (id, field, value) => setItems(prev => prev.map(i => i.id === id ? { ...i, [field]: value } : i));
+
+  // Used by the description field: sets the text, and if the chosen text matches
+  // a service that has a default price (and the line's price is still empty),
+  // auto-fills that price. She can always type over it.
+  const handleDescription = (id, value) => {
+    const match = SERVICE_CATALOG.find(s => s.name === value);
+    setItems(prev => prev.map(i => {
+      if (i.id !== id) return i;
+      const next = { ...i, description: value };
+      if (match && match.price !== "" && (i.unitPrice === "" || i.unitPrice == null)) {
+        next.unitPrice = match.price;
+      }
+      return next;
+    }));
+  };
 
   const lineTotal = (it) => (Number(it.qty) || 1) * (Number(it.unitPrice) || 0);
   const total = items.reduce((sum, it) => sum + lineTotal(it), 0);
@@ -429,9 +479,12 @@ function QuoteBuilder({ lead }) {
             ))}
           </div>
 
+          <datalist id="fg-service-options">
+            {SERVICE_CATALOG.map(s => <option key={s.name} value={s.name} />)}
+          </datalist>
           {items.map((it) => (
             <div key={it.id} style={{ display: "flex", gap: "6px", marginBottom: "8px", alignItems: "center" }}>
-              <input placeholder="Description (e.g. Deep clean, 3bd/2ba)" value={it.description} onChange={e => updateItem(it.id, "description", e.target.value)} style={{ ...inputStyle, flex: 1 }} />
+              <input list="fg-service-options" placeholder="Pick a service or type your own" value={it.description} onChange={e => handleDescription(it.id, e.target.value)} style={{ ...inputStyle, flex: 1 }} />
               <input type="number" min="1" placeholder="Qty" value={it.qty} onChange={e => updateItem(it.id, "qty", e.target.value)} style={{ ...inputStyle, width: "52px" }} />
               <input type="number" min="0" step="0.01" placeholder="Price" value={it.unitPrice} onChange={e => updateItem(it.id, "unitPrice", e.target.value)} style={{ ...inputStyle, width: "82px" }} />
               <button onClick={() => removeItem(it.id)} style={{ background: "transparent", border: 0, color: "#888", cursor: "pointer", fontSize: "18px", padding: "0 4px" }}>×</button>
@@ -600,12 +653,6 @@ function About() {
 }
 
 function Pricing() {
-  const addOns = [
-    ["Oven Cleaning", "$35"], ["Fridge Cleaning", "$40"], ["Dishes", "$25"],
-    ["Laundry (per load)", "$15"], ["Windows", "$25"], ["Ceiling Fans", "$15"],
-    ["Home Organization", "From $75"], ["Junk Removal", "Custom Quote"],
-  ];
-
   return (
     <section id="pricing" className="section section-dark">
       <div className="container pricing-wrap">
@@ -616,22 +663,16 @@ function Pricing() {
             Final pricing depends on square footage, condition, frequency, and service type. Request a quote for a custom estimate — we respond quickly.
           </p>
           <div className="price-panel">
-            {[
-              ["Commercial Cleaning", "$0.25 / sq ft"],
-              ["Residential (Recurring)", "Custom Quote"],
-              ["Deep Cleaning", "Custom Quote"],
-              ["Move In / Move Out", "Custom Quote"],
-              ["The Full Reset Bundle", "Custom Quote"],
-            ].map(([name, price]) => (
-              <div className="price-row" key={name}><span>{name}</span><strong>{price}</strong></div>
+            {MAIN_SERVICES.map((s) => (
+              <div className="price-row" key={s.name}><span>{s.name}</span><strong>{priceLabel(s)}</strong></div>
             ))}
           </div>
         </div>
         <div className="addons-panel">
           <h3>Add-On Services</h3>
           <div className="addons-list">
-            {addOns.map(([name, price]) => (
-              <div className="price-row" key={name}><span>{name}</span><strong>{price}</strong></div>
+            {ADDON_SERVICES.map((s) => (
+              <div className="price-row" key={s.name}><span>{s.name}</span><strong>{priceLabel(s)}</strong></div>
             ))}
           </div>
           <p className="addons-note">Baseboards included on every clean.</p>
