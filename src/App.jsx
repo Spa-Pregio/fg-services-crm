@@ -326,6 +326,7 @@ function AdminDashboard({ session }) {
                 </a>
               )}
             </div>
+            <QuoteBuilder lead={selected} />
           </div>
         </div>
       )}
@@ -334,6 +335,132 @@ function AdminDashboard({ session }) {
 }
 
 // ─── Public Site ─────────────────────────────────────
+function QuoteBuilder({ lead }) {
+  const [items, setItems] = useState([{ id: 1, description: "", qty: 1, unitPrice: "" }]);
+  const [frequency, setFrequency] = useState("one-time");
+  const [message, setMessage] = useState("");
+  const [status, setStatus] = useState("idle"); // idle | sending | sent | error
+  const [history, setHistory] = useState([]);
+  const [showBuilder, setShowBuilder] = useState(false);
+
+  useEffect(() => {
+    setItems([{ id: 1, description: "", qty: 1, unitPrice: "" }]);
+    setFrequency("one-time");
+    setMessage("");
+    setStatus("idle");
+    setShowBuilder(false);
+    fetchHistory();
+  }, [lead.id]);
+
+  const fetchHistory = async () => {
+    const { data } = await supabase
+      .from("quotes")
+      .select("*")
+      .eq("lead_id", String(lead.id))
+      .order("created_at", { ascending: false });
+    setHistory(data || []);
+  };
+
+  const addItem = () => setItems(prev => [...prev, { id: Date.now(), description: "", qty: 1, unitPrice: "" }]);
+  const removeItem = (id) => setItems(prev => prev.length > 1 ? prev.filter(i => i.id !== id) : prev);
+  const updateItem = (id, field, value) => setItems(prev => prev.map(i => i.id === id ? { ...i, [field]: value } : i));
+
+  const lineTotal = (it) => (Number(it.qty) || 1) * (Number(it.unitPrice) || 0);
+  const total = items.reduce((sum, it) => sum + lineTotal(it), 0);
+  const money = (n) => "$" + (Number(n) || 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+  const FREQ = [["one-time", "One-time"], ["weekly", "Weekly"], ["biweekly", "Every 2 wks"], ["monthly", "Monthly"]];
+  const recurring = frequency !== "one-time";
+  const canSend = !!lead.email && total > 0 && items.some(i => i.description.trim());
+
+  const sendQuote = async () => {
+    if (!canSend) return;
+    setStatus("sending");
+    const cleanItems = items
+      .filter(i => i.description.trim() || Number(i.unitPrice) > 0)
+      .map(i => ({ description: i.description.trim(), qty: Number(i.qty) || 1, unitPrice: Number(i.unitPrice) || 0 }));
+
+    const quote = {
+      lead_id: String(lead.id), customer_name: lead.name, customer_email: lead.email,
+      line_items: cleanItems, frequency, subtotal: total, total,
+      message: message.trim() || null, status: "sent",
+    };
+
+    const { error: dbError } = await supabase.from("quotes").insert([quote]);
+    if (dbError) { console.error("Save quote failed:", dbError); setStatus("error"); return; }
+
+    try {
+      await supabase.functions.invoke("send-customer-quote", { body: quote });
+    } catch (err) {
+      console.error("Quote email failed:", err);
+    }
+
+    setStatus("sent");
+    fetchHistory();
+  };
+
+  const inputStyle = { background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.12)", borderRadius: "8px", color: "#f6f2ea", padding: "8px 10px", fontSize: "13px", width: "100%", boxSizing: "border-box" };
+
+  return (
+    <div style={{ marginTop: "24px", borderTop: "1px solid rgba(255,255,255,0.1)", paddingTop: "20px" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <p style={{ color: "#d8b36a", fontSize: "12px", textTransform: "uppercase", letterSpacing: "0.06em", margin: 0 }}>Quotes</p>
+        {!showBuilder && (
+          <button onClick={() => setShowBuilder(true)} style={{ background: "rgba(216,179,106,0.15)", border: "1px solid rgba(216,179,106,0.3)", color: "#d8b36a", borderRadius: "8px", padding: "6px 12px", cursor: "pointer", fontSize: "12px" }}>+ New Quote</button>
+        )}
+      </div>
+
+      {history.length > 0 && (
+        <div style={{ marginTop: "12px", display: "flex", flexDirection: "column", gap: "6px" }}>
+          {history.map(h => (
+            <div key={h.id} style={{ display: "flex", justifyContent: "space-between", background: "rgba(255,255,255,0.04)", borderRadius: "8px", padding: "8px 12px", fontSize: "12px" }}>
+              <span style={{ color: "#cfc7b8" }}>{new Date(h.created_at).toLocaleDateString()} · {h.frequency === "one-time" ? "One-time" : h.frequency}</span>
+              <span style={{ color: "#f6f2ea", fontWeight: 600 }}>{money(h.total)}{h.frequency !== "one-time" ? "/visit" : ""}</span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {showBuilder && (
+        <div style={{ marginTop: "14px" }}>
+          <div style={{ display: "flex", gap: "6px", flexWrap: "wrap", marginBottom: "12px" }}>
+            {FREQ.map(([val, label]) => (
+              <button key={val} onClick={() => setFrequency(val)} style={{ background: frequency === val ? "rgba(216,179,106,0.2)" : "transparent", color: frequency === val ? "#d8b36a" : "#cfc7b8", border: "1px solid " + (frequency === val ? "#d8b36a" : "rgba(255,255,255,0.15)"), borderRadius: "999px", padding: "5px 12px", cursor: "pointer", fontSize: "12px" }}>{label}</button>
+            ))}
+          </div>
+
+          {items.map((it) => (
+            <div key={it.id} style={{ display: "flex", gap: "6px", marginBottom: "8px", alignItems: "center" }}>
+              <input placeholder="Description (e.g. Deep clean, 3bd/2ba)" value={it.description} onChange={e => updateItem(it.id, "description", e.target.value)} style={{ ...inputStyle, flex: 1 }} />
+              <input type="number" min="1" placeholder="Qty" value={it.qty} onChange={e => updateItem(it.id, "qty", e.target.value)} style={{ ...inputStyle, width: "52px" }} />
+              <input type="number" min="0" step="0.01" placeholder="Price" value={it.unitPrice} onChange={e => updateItem(it.id, "unitPrice", e.target.value)} style={{ ...inputStyle, width: "82px" }} />
+              <button onClick={() => removeItem(it.id)} style={{ background: "transparent", border: 0, color: "#888", cursor: "pointer", fontSize: "18px", padding: "0 4px" }}>×</button>
+            </div>
+          ))}
+          <button onClick={addItem} style={{ background: "transparent", border: "1px dashed rgba(255,255,255,0.2)", color: "#cfc7b8", borderRadius: "8px", padding: "6px", cursor: "pointer", fontSize: "12px", width: "100%", marginBottom: "12px" }}>+ Add line</button>
+
+          <div style={{ display: "flex", justifyContent: "space-between", padding: "10px 0", borderTop: "1px solid rgba(255,255,255,0.1)", marginBottom: "12px" }}>
+            <span style={{ color: "#d8b36a", fontSize: "14px", fontWeight: 600 }}>{recurring ? "Total per visit" : "Total"}</span>
+            <span style={{ color: "#d8b36a", fontSize: "16px", fontWeight: 700 }}>{money(total)}</span>
+          </div>
+
+          <textarea placeholder="Optional note to the customer..." value={message} onChange={e => setMessage(e.target.value)} rows={2} style={{ ...inputStyle, resize: "vertical", marginBottom: "12px", fontFamily: "inherit" }} />
+
+          {status === "sent" ? (
+            <p style={{ color: "#50c878", fontSize: "13px", textAlign: "center", margin: "8px 0" }}>✓ Quote sent to {lead.email}</p>
+          ) : (
+            <button onClick={sendQuote} disabled={!canSend || status === "sending"} className="btn btn-gold" style={{ width: "100%", fontSize: "14px", opacity: canSend && status !== "sending" ? 1 : 0.5, cursor: canSend ? "pointer" : "not-allowed" }}>
+              {status === "sending" ? "Sending..." : "Send Quote to Customer"}
+            </button>
+          )}
+          {status === "error" && <p style={{ color: "#ff6b6b", fontSize: "12px", textAlign: "center", margin: "8px 0 0" }}>Couldn't save the quote — try again.</p>}
+          {!lead.email && <p style={{ color: "#ff6b6b", fontSize: "12px", textAlign: "center", margin: "8px 0 0" }}>This lead has no email on file.</p>}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function Header({ onQuote }) {
   return (
     <header className="header">
