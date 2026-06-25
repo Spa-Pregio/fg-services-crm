@@ -216,7 +216,7 @@ function AdminDashboard({ session }) {
               <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "14px" }}>
                 <thead>
                   <tr style={{ borderBottom: "1px solid rgba(255,255,255,0.08)" }}>
-                    {["Name", "Service", "City", "Phone", "Date", "Status", "Actions"].map(h => (
+                    {["Name", "Service", "Source", "City", "Phone", "Date", "Status", "Actions"].map(h => (
                       <th key={h} style={{ padding: "14px 16px", textAlign: "left", color: "#cfc7b8", fontSize: "12px", textTransform: "uppercase", letterSpacing: "0.06em", fontWeight: 600 }}>{h}</th>
                     ))}
                   </tr>
@@ -232,6 +232,7 @@ function AdminDashboard({ session }) {
                         <div style={{ fontSize: "12px", color: "#cfc7b8" }}>{lead.email}</div>
                       </td>
                       <td style={{ padding: "14px 16px", color: "#cfc7b8" }}>{lead.service}</td>
+                      <td style={{ padding: "14px 16px", color: "#d8b36a", whiteSpace: "nowrap" }}>{lead.source || "—"}</td>
                       <td style={{ padding: "14px 16px", color: "#cfc7b8" }}>{lead.city || "—"}</td>
                       <td style={{ padding: "14px 16px", color: "#cfc7b8" }}>{lead.phone || "—"}</td>
                       <td style={{ padding: "14px 16px", color: "#cfc7b8", whiteSpace: "nowrap" }}>
@@ -287,6 +288,7 @@ function AdminDashboard({ session }) {
               ["Phone", selected.phone || "Not provided"],
               ["City", selected.city || "Not provided"],
               ["Service", selected.service],
+              ["Source", selected.source || "website"],
               ["Sq Ft / Budget", selected.quote || "Not provided"],
               ["Submitted", new Date(selected.created_at).toLocaleString()],
             ].map(([label, value]) => (
@@ -377,6 +379,7 @@ function QuoteBuilder({ lead }) {
   const [status, setStatus] = useState("idle"); // idle | sending | sent | error
   const [history, setHistory] = useState([]);
   const [showBuilder, setShowBuilder] = useState(false);
+  const [discount, setDiscount] = useState(0);
 
   useEffect(() => {
     setItems([{ id: 1, description: "", qty: 1, unitPrice: "" }]);
@@ -384,6 +387,7 @@ function QuoteBuilder({ lead }) {
     setMessage("");
     setStatus("idle");
     setShowBuilder(false);
+    setDiscount(lead.source === "hanger" ? 30 : lead.source === "referral" ? 25 : 0);
     fetchHistory();
   }, [lead.id]);
 
@@ -416,7 +420,9 @@ function QuoteBuilder({ lead }) {
   };
 
   const lineTotal = (it) => (Number(it.qty) || 1) * (Number(it.unitPrice) || 0);
-  const total = items.reduce((sum, it) => sum + lineTotal(it), 0);
+  const subtotal = items.reduce((sum, it) => sum + lineTotal(it), 0);
+  const discountNum = Math.min(Number(discount) || 0, subtotal);
+  const total = Math.max(0, subtotal - discountNum);
   const money = (n) => "$" + (Number(n) || 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
   const FREQ = [["one-time", "One-time"], ["weekly", "Weekly"], ["biweekly", "Every 2 wks"], ["monthly", "Monthly"]];
@@ -430,9 +436,16 @@ function QuoteBuilder({ lead }) {
       .filter(i => i.description.trim() || Number(i.unitPrice) > 0)
       .map(i => ({ description: i.description.trim(), qty: Number(i.qty) || 1, unitPrice: Number(i.unitPrice) || 0 }));
 
+    if (discountNum > 0) {
+      const label = lead.source === "hanger" ? "Neighbor discount (door hanger)"
+        : lead.source === "referral" ? "Referral discount"
+        : "Discount";
+      cleanItems.push({ description: label, qty: 1, unitPrice: -discountNum });
+    }
+
     const quote = {
       lead_id: String(lead.id), customer_name: lead.name, customer_email: lead.email,
-      line_items: cleanItems, frequency, subtotal: total, total,
+      line_items: cleanItems, frequency, subtotal, total,
       message: message.trim() || null, status: "sent",
     };
 
@@ -492,9 +505,25 @@ function QuoteBuilder({ lead }) {
           ))}
           <button onClick={addItem} style={{ background: "transparent", border: "1px dashed rgba(255,255,255,0.2)", color: "#cfc7b8", borderRadius: "8px", padding: "6px", cursor: "pointer", fontSize: "12px", width: "100%", marginBottom: "12px" }}>+ Add line</button>
 
-          <div style={{ display: "flex", justifyContent: "space-between", padding: "10px 0", borderTop: "1px solid rgba(255,255,255,0.1)", marginBottom: "12px" }}>
-            <span style={{ color: "#d8b36a", fontSize: "14px", fontWeight: 600 }}>{recurring ? "Total per visit" : "Total"}</span>
-            <span style={{ color: "#d8b36a", fontSize: "16px", fontWeight: 700 }}>{money(total)}</span>
+          <div style={{ borderTop: "1px solid rgba(255,255,255,0.1)", marginBottom: "12px", paddingTop: "10px" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "4px 0" }}>
+              <span style={{ color: "#cfc7b8", fontSize: "13px" }}>Subtotal</span>
+              <span style={{ color: "#cfc7b8", fontSize: "13px" }}>{money(subtotal)}</span>
+            </div>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "4px 0" }}>
+              <span style={{ color: "#cfc7b8", fontSize: "13px" }}>
+                Discount{lead.source === "hanger" ? " (door hanger)" : lead.source === "referral" ? " (referral)" : ""}
+              </span>
+              <span style={{ display: "flex", alignItems: "center", gap: "4px" }}>
+                <span style={{ color: "#cfc7b8", fontSize: "13px" }}>−$</span>
+                <input type="number" min="0" step="1" value={discount} onChange={e => setDiscount(e.target.value)}
+                  style={{ ...inputStyle, width: "70px", padding: "4px 8px", textAlign: "right" }} />
+              </span>
+            </div>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 0 0", borderTop: "1px solid rgba(255,255,255,0.08)", marginTop: "4px" }}>
+              <span style={{ color: "#d8b36a", fontSize: "14px", fontWeight: 600 }}>{recurring ? "Total per visit" : "Total"}</span>
+              <span style={{ color: "#d8b36a", fontSize: "16px", fontWeight: 700 }}>{money(total)}</span>
+            </div>
           </div>
 
           <textarea placeholder="Optional note to the customer..." value={message} onChange={e => setMessage(e.target.value)} rows={2} style={{ ...inputStyle, resize: "vertical", marginBottom: "12px", fontFamily: "inherit" }} />
@@ -766,11 +795,15 @@ function QuoteModal({ onClose }) {
     e.preventDefault();
     setStatus("loading");
 
+    const params = new URLSearchParams(window.location.search);
+    const source = params.get("src") || params.get("ref") || "website";
+
     const lead = {
       name: form.name, email: form.email,
       phone: form.phone || null, city: form.city || null,
       service: form.service, quote: form.quote ? parseFloat(form.quote) : null,
       notes: form.notes || null, status: "new",
+      source,
     };
 
     // 1. Save the lead to Supabase (powers the /admin dashboard)
