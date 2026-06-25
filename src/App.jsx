@@ -387,7 +387,7 @@ function QuoteBuilder({ lead }) {
     setMessage("");
     setStatus("idle");
     setShowBuilder(false);
-    setDiscount(lead.source === "hanger" ? 30 : lead.source === "referral" ? 25 : 0);
+    setDiscount(lead.source?.startsWith("hanger") ? 30 : lead.source?.startsWith("referral") ? 25 : 0);
     fetchHistory();
   }, [lead.id]);
 
@@ -437,8 +437,8 @@ function QuoteBuilder({ lead }) {
       .map(i => ({ description: i.description.trim(), qty: Number(i.qty) || 1, unitPrice: Number(i.unitPrice) || 0 }));
 
     if (discountNum > 0) {
-      const label = lead.source === "hanger" ? "Neighbor discount (door hanger)"
-        : lead.source === "referral" ? "Referral discount"
+      const label = lead.source?.startsWith("hanger") ? "Neighbor discount (door hanger)"
+        : lead.source?.startsWith("referral") ? "Referral discount"
         : "Discount";
       cleanItems.push({ description: label, qty: 1, unitPrice: -discountNum });
     }
@@ -512,7 +512,7 @@ function QuoteBuilder({ lead }) {
             </div>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "4px 0" }}>
               <span style={{ color: "#cfc7b8", fontSize: "13px" }}>
-                Discount{lead.source === "hanger" ? " (door hanger)" : lead.source === "referral" ? " (referral)" : ""}
+                Discount{lead.source?.startsWith("hanger") ? " (door hanger)" : lead.source?.startsWith("referral") ? " (referral)" : ""}
               </span>
               <span style={{ display: "flex", alignItems: "center", gap: "4px" }}>
                 <span style={{ color: "#cfc7b8", fontSize: "13px" }}>−$</span>
